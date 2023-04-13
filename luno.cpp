@@ -1,0 +1,30 @@
+#include <memory>
+
+namespace luno {
+    namespace line_parser {
+
+        class File {
+        public:
+            const char* const filename;
+            const char* const content;
+        };
+
+        class Line {
+        public:
+            const File* const file;
+            const char* const start;
+            const int length;
+            const int number;
+        };
+
+    }
+
+}
+
+using namespace luno::line_parser;
+
+int main(int argc, char** argv) {
+    File file{"filename.txt", "content.txt"};
+    Line line{&file, "filename.txt", 10, 10};
+    return 0;
+}
