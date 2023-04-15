@@ -23,8 +23,9 @@ namespace luno {
 
 using namespace luno::line_parser;
 
-int main(int argc, char** argv) {
+int main(int , char** ) {
     File file{"filename.txt", "content.txt"};
     Line line{&file, "filename.txt", 10, 10};
+    (void)line;
     return 0;
 }
