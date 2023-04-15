@@ -1,3 +1,5 @@
+# Copyright (c) 2023 Jean-François Boismenu
+
 fail_fast: false
 repos:
   - repo: https://github.com/pocc/pre-commit-hooks
@@ -11,3 +13,26 @@ repos:
       # - id: cppcheck
       # - id: cpplint
       # - id: include-what-you-use
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.1
+    hooks:
+      - id: remove-crlf
+      - id: remove-tabs
+        args: [--whitespaces-count, '4']  # defaults to: 4
+      - id: insert-license
+        files: \.cpp|h$
+        args:
+          - --license-filepath
+          - LICENSE.simple        # defaults to: LICENSE.txt
+          - --comment-style
+          - //                            # defaults to:  #
+          - --use-current-year
+      - id: insert-license
+        files: \.ya*ml$
+        args:
+          - --license-filepath
+          - LICENSE.simple        # defaults to: LICENSE.txt
+          - --comment-style
+          - "#"                           # defaults to:  #
+          - --use-current-year

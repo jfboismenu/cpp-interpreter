@@ -1,3 +1,5 @@
+// Copyright (c) 2023 Jean-François Boismenu
+
 #include <memory>
 
 namespace luno {
