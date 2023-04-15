@@ -19,20 +19,31 @@ repos:
     hooks:
       - id: remove-crlf
       - id: remove-tabs
-        args: [--whitespaces-count, '4']  # defaults to: 4
+        args: [--whitespaces-count, '4']
       - id: insert-license
         files: \.cpp|h$
         args:
           - --license-filepath
-          - LICENSE.simple        # defaults to: LICENSE.txt
+          - LICENSE.simple
           - --comment-style
-          - //                            # defaults to:  #
+          - //
           - --use-current-year
       - id: insert-license
         files: \.ya*ml$
         args:
           - --license-filepath
-          - LICENSE.simple        # defaults to: LICENSE.txt
+          - LICENSE.simple
           - --comment-style
-          - "#"                           # defaults to:  #
+          - "#"
           - --use-current-year
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0  # Use the ref you want to point at
+    hooks:
+    - id: trailing-whitespace
+    - id: check-case-conflict
+    - id: check-shebang-scripts-are-executable
+    - id: check-merge-conflict
+    - id: check-yaml
+    - id: end-of-file-fixer
+    - id: mixed-line-ending
+    - id: no-commit-to-branch
