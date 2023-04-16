@@ -84,7 +84,7 @@ void populate_translation_unit(File &file, TranslationUnit &unit)
             start = &file.content[i] + 1;
         }
     }
-    if (&file.content.back() != start)
+    if (&file.content.back() <= start)
     {
         unit.lines.emplace_back(Line{&file, start, int(&file.content.back() - start) + 1, line_no});
     }
@@ -97,10 +97,11 @@ int main(int, char **argv)
     std::cout << file.content << std::endl;
     TranslationUnit tu;
     populate_translation_unit(file, tu);
-    assert(tu.lines.size() == 5);
-    assert(tu.lines[0].content() == "int i = 0;");
-    assert(tu.lines[1].content() == "const char* j = \"this is a \\n \\\" string\";");
-    assert(tu.lines[2].content() == "int k = 0x1234;");
-    assert(tu.lines[3].content() == "char l = 'c';");
+    assert(tu.lines[2].content() == "int i = 0;");
+    assert(tu.lines[3].content() == R"delim(const char *j = "this is a \n \" string";)delim");
+    assert(tu.lines[4].content() == "int k = 0x1234;");
+    assert(tu.lines[5].content() == "char l = 'c';");
+    assert(tu.lines[6].content() == "bool m = true;");
+    assert(tu.lines[7].content() == "");
     return 0;
 }
