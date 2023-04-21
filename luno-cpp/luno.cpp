@@ -21,51 +21,170 @@ class TranslationUnit
     std::vector<Line> lines;
 };
 
-// class Token {
-//     const char *const start;
-//     const char *const end;
-// };
-
 enum class PreprocessorState
 {
-    start_of_line,
+    empty_state,
+    error,
     identifier,
-    decimal,
-    octal,
-    binary,
-    floating,
-    hexadecimal,
+    decimal_constant,
     directive,
     last_state = directive
 };
 
-enum class StateTransition
+enum class CharacterType
 {
-    identifier_char,
+    unsupported_character,
     whitespace,
+    letter,
     number,
+    other,
 };
 
-std::array<StateTransition, 128> character_types;
-
-void populate_character_types()
+enum class TokenType
 {
+    header_name,
+    identifier,
+    number,
+    character_constant,
+    string_literal,
+    operator_,
+    punctuator,
+    other
+};
+
+class Token
+{
+  public:
+    Token(TokenType type, char first_char, int line, int column)
+        : _value(first_char, 1), _type(type), _line(line), _column(column)
+    {
+    }
+
+    TokenType type() const
+    {
+        return _type;
+    }
+
+    int line() const
+    {
+        return _line;
+    }
+
+    int column() const
+    {
+        return _column;
+    }
+
+    std::string value() const
+    {
+        return _value;
+    }
+
+  private:
+    std::string _value;
+    int _line;
+    int _column;
+    TokenType _type;
+};
+
+class Parser
+{
+  public:
+    Parser(TranslationUnit &tu) : _tu(tu)
+    {
+    }
+
+    char get_next_char()
+    {
+        return _tu.lines[_current_line].content[_current_column];
+    }
+
+    int current_line() const
+    {
+        return _current_line;
+    }
+
+    int current_column() const
+    {
+        return _current_column;
+    }
+
+    bool is_finished() const
+    {
+        return _current_line == _tu.lines.size();
+    }
+
+  private:
+    TranslationUnit &_tu;
+    int _current_line = 0;
+    int _current_column = 0;
+};
+
+class ParserState
+{
+  public:
+    Parser parser;
+    std::vector<Token> tokens;
+    Token current_token;
+};
+
+std::array<CharacterType, 128> initialize_character_types()
+{
+    std::array<CharacterType, 128> character_types;
+    for (auto &type : character_types)
+    {
+        type = CharacterType::unsupported_character;
+    }
     for (auto letter = 'a'; letter <= 'z'; ++letter)
     {
-        character_types[letter] = StateTransition::identifier_char;
+        character_types[letter] = CharacterType::letter;
     }
     for (auto letter = 'A'; letter <= 'Z'; ++letter)
     {
-        character_types[letter] = StateTransition::identifier_char;
+        character_types[letter] = CharacterType::letter;
     }
-    for (auto letter = '0'; letter <= '9'; ++letter)
+    for (auto number = '0'; number <= '9'; ++number)
     {
-        character_types[letter] = StateTransition::number;
+        character_types[number] = CharacterType::number;
     }
-    character_types['_'] = StateTransition::identifier_char;
-    character_types[' '] = StateTransition::whitespace;
-    character_types['\t'] = StateTransition::whitespace;
-    character_types['\n'] = StateTransition::whitespace;
+    character_types[' '] = CharacterType::whitespace;
+    character_types['\t'] = CharacterType::whitespace;
+    character_types['\n'] = CharacterType::whitespace;
+
+    return character_types;
+}
+
+std::array<CharacterType, 128> character_types = initialize_character_types();
+
+PreprocessorState empty_state(ParserState &state)
+{
+    const char c = state.parser.get_next_char();
+
+    if (character_types[c] == CharacterType::whitespace)
+    {
+        return PreprocessorState::empty_state;
+    }
+    else if (character_types[c] == CharacterType::letter or c == '_')
+    {
+        state.current_token =
+            Token(TokenType::identifier, c, state.parser.current_line(), state.parser.current_column());
+        return PreprocessorState::identifier;
+    }
+    else if (character_types[c] == CharacterType::number)
+    {
+        state.current_token = Token(TokenType::number, c, state.parser.current_line(), state.parser.current_column());
+        if (c != '0')
+        {
+            return PreprocessorState::decimal_constant;
+        }
+        assert(c != '0');
+    }
+    else if (c == ';')
+    {
+        state.tokens.emplace_back(TokenType::punctuator, c, state.parser.current_line(), state.parser.current_column());
+        return PreprocessorState::empty_state;
+    }
+    return PreprocessorState::error;
 }
 
 void populate_translation_unit(File &file, TranslationUnit &unit)
