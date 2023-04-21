@@ -27,9 +27,13 @@ enum class PreprocessorState
     error,
     identifier,
     decimal_constant,
-    directive,
-    last_state = directive
+    single_line_comment,
+    multi_line_comment,
+    first = empty_state,
+    last = multi_line_comment
 };
+
+const int NB_PREPROCESSOR_STATES = int(PreprocessorState::last) - int(PreprocessorState::first) + 1;
 
 enum class CharacterType
 {
@@ -37,13 +41,16 @@ enum class CharacterType
     whitespace,
     letter,
     number,
+    punctuator,
     other,
 };
 
 enum class TokenType
 {
+    invalid,
     header_name,
     identifier,
+    comment,
     number,
     character_constant,
     string_literal,
@@ -55,9 +62,16 @@ enum class TokenType
 class Token
 {
   public:
+    Token() = default;
+    Token &operator=(const Token &) = default;
     Token(TokenType type, char first_char, int line, int column)
-        : _value(first_char, 1), _type(type), _line(line), _column(column)
+        : _value(1, first_char), _type(type), _line(line), _column(column)
     {
+    }
+
+    void append(char c)
+    {
+        _value.push_back(c);
     }
 
     TokenType type() const
@@ -82,9 +96,9 @@ class Token
 
   private:
     std::string _value;
-    int _line;
-    int _column;
-    TokenType _type;
+    int _line = 0;
+    int _column = 0;
+    TokenType _type = TokenType::invalid;
 };
 
 class Parser
@@ -94,9 +108,37 @@ class Parser
     {
     }
 
-    char get_next_char()
+    char get_current_char()
     {
         return _tu.lines[_current_line].content[_current_column];
+    }
+
+    char peek_next_char()
+    {
+        // backup the current position
+        const int current_column(_current_column);
+        const int current_line(_current_line);
+        // Advance and get the next char
+        advance();
+        const char c = get_current_char();
+        // Restore the current position.
+        _current_column = current_column;
+        _current_line = current_line;
+
+        return c;
+    }
+
+    void advance()
+    {
+        // Move forward
+        ++_current_column;
+
+        // If we've hit the end of the line, move on to the next line.
+        if (_tu.lines[_current_line].content.size() == _current_column)
+        {
+            _current_column = 0;
+            _current_line += 1;
+        }
     }
 
     int current_line() const
@@ -123,9 +165,27 @@ class Parser
 class ParserState
 {
   public:
+    ParserState(TranslationUnit &tu) : parser(tu)
+    {
+    }
+
     Parser parser;
-    std::vector<Token> tokens;
     Token current_token;
+
+    void flush_token()
+    {
+        _tokens.emplace_back(current_token);
+        std::cout << current_token.value() << std::endl;
+        current_token = Token();
+    }
+
+    std::vector<Token> get_tokens() const
+    {
+        return _tokens;
+    }
+
+  private:
+    std::vector<Token> _tokens;
 };
 
 std::array<CharacterType, 128> initialize_character_types()
@@ -147,9 +207,14 @@ std::array<CharacterType, 128> initialize_character_types()
     {
         character_types[number] = CharacterType::number;
     }
-    character_types[' '] = CharacterType::whitespace;
-    character_types['\t'] = CharacterType::whitespace;
-    character_types['\n'] = CharacterType::whitespace;
+    for (auto punctuator : "!%^&*()-+={}|~[\\;':\"<>?,./#)")
+    {
+        character_types[punctuator] = CharacterType::punctuator;
+    }
+    for (auto whitespace : " \t\n")
+    {
+        character_types[whitespace] = CharacterType::whitespace;
+    }
 
     return character_types;
 }
@@ -158,7 +223,10 @@ std::array<CharacterType, 128> character_types = initialize_character_types();
 
 PreprocessorState empty_state(ParserState &state)
 {
-    const char c = state.parser.get_next_char();
+    const char c = state.parser.get_current_char();
+    const int current_line = state.parser.current_line();
+    const int current_column = state.parser.current_column();
+    state.parser.advance();
 
     if (character_types[c] == CharacterType::whitespace)
     {
@@ -166,26 +234,77 @@ PreprocessorState empty_state(ParserState &state)
     }
     else if (character_types[c] == CharacterType::letter or c == '_')
     {
-        state.current_token =
-            Token(TokenType::identifier, c, state.parser.current_line(), state.parser.current_column());
+        state.current_token = Token(TokenType::identifier, c, current_line, current_column);
         return PreprocessorState::identifier;
     }
     else if (character_types[c] == CharacterType::number)
     {
-        state.current_token = Token(TokenType::number, c, state.parser.current_line(), state.parser.current_column());
+        state.current_token = Token(TokenType::number, c, current_line, current_column);
         if (c != '0')
         {
             return PreprocessorState::decimal_constant;
         }
         assert(c != '0');
     }
-    else if (c == ';')
+    else if (c == '/' and state.parser.get_current_char() == '/')
     {
-        state.tokens.emplace_back(TokenType::punctuator, c, state.parser.current_line(), state.parser.current_column());
+        state.current_token = Token(TokenType::comment, c, current_line, current_column);
+        return PreprocessorState::single_line_comment;
+    }
+    else if (character_types[c] == CharacterType::punctuator)
+    {
+        state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
+        state.flush_token();
         return PreprocessorState::empty_state;
     }
+
     return PreprocessorState::error;
 }
+
+PreprocessorState identifier_state(ParserState &state)
+{
+    // If the next character is letter, number or underscore, we're still parsing an identifier.
+    const char c = state.parser.get_current_char();
+    if (character_types[c] == CharacterType::letter || character_types[c] == CharacterType::number or c == '_')
+    {
+        state.current_token.append(c);
+        state.parser.advance();
+        return PreprocessorState::identifier;
+    }
+    // Otherwise the identifier is over. We do not advance the parsing.
+    state.flush_token();
+    return PreprocessorState::empty_state;
+}
+
+PreprocessorState single_line_comment_state(ParserState &state)
+{
+    const char c = state.parser.get_current_char();
+    state.parser.advance();
+
+    if (c == '\n')
+    {
+        state.flush_token();
+        return PreprocessorState::empty_state;
+    }
+    else
+    {
+        state.current_token.append(c);
+        return PreprocessorState::single_line_comment;
+    }
+}
+
+typedef PreprocessorState (*PreprocessorStateFunc)(ParserState &);
+
+std::array<PreprocessorStateFunc, NB_PREPROCESSOR_STATES> initialize_preprocessor_funcs()
+{
+    std::array<PreprocessorStateFunc, NB_PREPROCESSOR_STATES> states;
+    states[int(PreprocessorState::empty_state)] = empty_state;
+    states[int(PreprocessorState::identifier)] = identifier_state;
+    states[int(PreprocessorState::single_line_comment)] = single_line_comment_state;
+    return states;
+}
+
+std::array<PreprocessorStateFunc, NB_PREPROCESSOR_STATES> preprocessor_funcs = initialize_preprocessor_funcs();
 
 void populate_translation_unit(File &file, TranslationUnit &unit)
 {
@@ -195,31 +314,72 @@ void populate_translation_unit(File &file, TranslationUnit &unit)
     {
         if (file.content[i] == '\n')
         {
-            unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content[i] - start)), line_no});
+            unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content[i] - start + 1)), line_no});
             ++line_no;
             start = &file.content[i] + 1;
         }
     }
     if (&file.content.back() <= start)
     {
-        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start) + 1), line_no});
+        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start + 1)), line_no});
     }
+}
+
+void parse_translation_unit(ParserState &state)
+{
+
+    PreprocessorState current = PreprocessorState::empty_state;
+
+    while (!state.parser.is_finished())
+    {
+        current = preprocessor_funcs[int(current)](state);
+        if (current == PreprocessorState::error)
+        {
+            throw std::runtime_error("Unexpected compiler error.");
+        }
+    }
+}
+
+void test_line_parsing(File &file, TranslationUnit &tu)
+{
+    populate_translation_unit(file, tu);
+    assert(tu.lines[0].content == "// Copyright (c) 2023 Jean-François Boismenu\n");
+    assert(tu.lines[1].content == "\n");
+    assert(tu.lines[2].content == "int i = 0;\n");
+    assert(tu.lines[3].content == R"delim(const char *j = "this is a \n \" string";)delim" + std::string("\n"));
+    assert(tu.lines[4].content == "int k = 0x1234;\n");
+    assert(tu.lines[5].content == "char l = 'c';\n");
+    assert(tu.lines[6].content == "bool m = true;\n");
+    assert(tu.lines[7].content == "");
+    std::cout << "test_line_parsing passed!" << std::endl;
+}
+
+void test_tokenization(ParserState &state)
+{
+    parse_translation_unit(state);
+    std::cout << "test_tokenization passed!" << std::endl;
+}
+
+void run_tests()
+{
+
+    const auto current_file = std::filesystem::path(__FILE__);
+    const auto parent_folder = current_file.parent_path();
+    const auto test_file = parent_folder / "test.cpp";
+
+    File file(File::read_file(test_file.c_str()));
+
+    TranslationUnit tu;
+    test_line_parsing(file, tu);
+
+    ParserState state{ParserState(tu)};
+    test_tokenization(state);
 }
 
 } // namespace
 
 int main(int, char **argv)
 {
-    std::cout << argv[1] << std::endl;
-    File file(File::read_file(argv[1]));
-    std::cout << file.content << std::endl;
-    TranslationUnit tu;
-    populate_translation_unit(file, tu);
-    assert(tu.lines[2].content == "int i = 0;");
-    assert(tu.lines[3].content == R"delim(const char *j = "this is a \n \" string";)delim");
-    assert(tu.lines[4].content == "int k = 0x1234;");
-    assert(tu.lines[5].content == "char l = 'c';");
-    assert(tu.lines[6].content == "bool m = true;");
-    assert(tu.lines[7].content == "");
+    run_tests();
     return 0;
 }
