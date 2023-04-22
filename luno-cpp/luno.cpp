@@ -27,6 +27,9 @@ enum class PreprocessorState
     error,
     identifier,
     decimal_constant,
+    hexadecimal_constant,
+    string_literal,
+    character_literal,
     single_line_comment,
     multi_line_comment,
     first = empty_state,
@@ -110,11 +113,21 @@ class Parser
 
     char get_current_char()
     {
+        // If we're already at the end of the file, just return a whitespace.
+        if (_current_line == _tu.lines.size())
+        {
+            return '\0';
+        }
         return _tu.lines[_current_line].content[_current_column];
     }
 
     char peek_next_char()
     {
+        // If we're already at the end of the file, just return a whitespace.
+        if (_current_line == _tu.lines.size())
+        {
+            return '\0';
+        }
         // backup the current position
         const int current_column(_current_column);
         const int current_line(_current_line);
@@ -240,16 +253,22 @@ PreprocessorState empty_state(ParserState &state)
     else if (character_types[c] == CharacterType::number)
     {
         state.current_token = Token(TokenType::number, c, current_line, current_column);
-        if (c != '0')
-        {
-            return PreprocessorState::decimal_constant;
-        }
-        assert(c != '0');
+        return PreprocessorState::decimal_constant;
     }
     else if (c == '/' and state.parser.get_current_char() == '/')
     {
         state.current_token = Token(TokenType::comment, c, current_line, current_column);
         return PreprocessorState::single_line_comment;
+    }
+    else if (c == '"')
+    {
+        state.current_token = Token(TokenType::string_literal, c, current_line, current_column);
+        return PreprocessorState::string_literal;
+    }
+    else if (c == '\'')
+    {
+        state.current_token = Token(TokenType::character_constant, c, current_line, current_column);
+        return PreprocessorState::character_literal;
     }
     else if (character_types[c] == CharacterType::punctuator)
     {
@@ -258,6 +277,7 @@ PreprocessorState empty_state(ParserState &state)
         return PreprocessorState::empty_state;
     }
 
+    std::cout << c << std::endl;
     return PreprocessorState::error;
 }
 
@@ -273,6 +293,31 @@ PreprocessorState identifier_state(ParserState &state)
     }
     // Otherwise the identifier is over. We do not advance the parsing.
     state.flush_token();
+    return PreprocessorState::empty_state;
+}
+
+PreprocessorState decimal_state(ParserState &state)
+{
+    const char c = state.parser.get_current_char();
+
+    if (character_types[c] == CharacterType::number || c == '.' || c == 'x' || c == 'X' || ('0' <= c && c <= '9') ||
+        ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'))
+    {
+        // We have a number, so we can append the char and move to the next
+        // one while we remain in the same state. This can yield an invalid token
+        // but we're not going to care for that. Once we validate our tokens
+        // during the next pass we'll see right away that is was invalid.
+        state.parser.advance();
+        state.current_token.append(c);
+
+        // FIXME: When parsing an hexadecimal number, we can have + and -. We do
+        // not support these at the moment.
+        return PreprocessorState::decimal_constant;
+    }
+
+    // We found a character that is not part of the number, so we're done.
+    state.flush_token();
+
     return PreprocessorState::empty_state;
 }
 
@@ -293,6 +338,40 @@ PreprocessorState single_line_comment_state(ParserState &state)
     }
 }
 
+PreprocessorState _string_or_character_state(ParserState &state, const char delimiter, PreprocessorState char_state)
+{
+    const char c = state.parser.get_current_char();
+
+    // We're inside a string, so whatever the character is, we're adding it to
+    // the literal.
+    state.parser.advance();
+    // We are closing the string only if the previous character wasn't
+    // a backslash.
+    if (c == delimiter && state.current_token.value().back() != '\\')
+    {
+        state.current_token.append(c);
+        state.flush_token();
+        return PreprocessorState::empty_state;
+    }
+    if (c == '\0')
+    {
+        state.flush_token();
+        return PreprocessorState::empty_state;
+    }
+    state.current_token.append(c);
+    return char_state;
+}
+
+PreprocessorState string_literal_state(ParserState &state)
+{
+    return _string_or_character_state(state, '"', PreprocessorState::string_literal);
+}
+
+PreprocessorState character_literal_state(ParserState &state)
+{
+    return _string_or_character_state(state, '\'', PreprocessorState::character_literal);
+}
+
 typedef PreprocessorState (*PreprocessorStateFunc)(ParserState &);
 
 std::array<PreprocessorStateFunc, NB_PREPROCESSOR_STATES> initialize_preprocessor_funcs()
@@ -301,6 +380,9 @@ std::array<PreprocessorStateFunc, NB_PREPROCESSOR_STATES> initialize_preprocesso
     states[int(PreprocessorState::empty_state)] = empty_state;
     states[int(PreprocessorState::identifier)] = identifier_state;
     states[int(PreprocessorState::single_line_comment)] = single_line_comment_state;
+    states[int(PreprocessorState::decimal_constant)] = decimal_state;
+    states[int(PreprocessorState::string_literal)] = string_literal_state;
+    states[int(PreprocessorState::character_literal)] = character_literal_state;
     return states;
 }
 
@@ -349,8 +431,9 @@ void test_line_parsing(File &file, TranslationUnit &tu)
     assert(tu.lines[3].content == R"delim(const char *j = "this is a \n \" string";)delim" + std::string("\n"));
     assert(tu.lines[4].content == "int k = 0x1234;\n");
     assert(tu.lines[5].content == "char l = 'c';\n");
-    assert(tu.lines[6].content == "bool m = true;\n");
-    assert(tu.lines[7].content == "");
+    assert(tu.lines[6].content == "float d = 3.1416;\n");
+    assert(tu.lines[7].content == "bool m = true;\n");
+    assert(tu.lines[8].content == "");
     std::cout << "test_line_parsing passed!" << std::endl;
 }
 
