@@ -143,6 +143,10 @@ class Parser
 
     void advance()
     {
+        if (_current_line == _tu.lines.size())
+        {
+            return;
+        }
         // Move forward
         ++_current_column;
 
@@ -353,7 +357,7 @@ PreprocessorState _string_or_character_state(ParserState &state, const char deli
         state.flush_token();
         return PreprocessorState::empty_state;
     }
-    if (c == '\0')
+    if (c == '\n')
     {
         state.flush_token();
         return PreprocessorState::empty_state;
@@ -396,14 +400,15 @@ void populate_translation_unit(File &file, TranslationUnit &unit)
     {
         if (file.content[i] == '\n')
         {
-            unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content[i] - start + 1)), line_no});
+            std::string content(start, int(&file.content[i] - start + 1));
+            unit.lines.emplace_back(Line{&file, content, line_no});
             ++line_no;
             start = &file.content[i] + 1;
         }
     }
-    if (&file.content.back() <= start)
+    if (start < &file.content.back())
     {
-        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start + 1)), line_no});
+        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start)), line_no});
     }
 }
 
