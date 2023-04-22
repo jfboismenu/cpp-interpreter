@@ -3,12 +3,34 @@
 #include <luno-cpp/file.h>
 #include <luno-cpp/line.h>
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
+
+template <typename T> std::ostream &operator<<(std::ostream &os, const std::vector<T> &items)
+{
+    for (auto const &item : items)
+    {
+        os << item << ", ";
+    }
+    return os;
+}
+
+#define luno_assert(lfs, comp, rhs)                                                                                    \
+    {                                                                                                                  \
+        if (!((lfs)comp(rhs)))                                                                                         \
+        {                                                                                                              \
+            std::ostringstream os;                                                                                     \
+            const std::string comparator(#comp);                                                                       \
+            os << (lfs) << std::endl << comparator << std::endl << (rhs) << std::endl << " failed!";                   \
+            throw std::runtime_error(os.str());                                                                        \
+        }                                                                                                              \
+    }
 
 namespace
 {
@@ -196,7 +218,7 @@ class ParserState
         current_token = Token();
     }
 
-    std::vector<Token> get_tokens() const
+    const std::vector<Token> &get_tokens() const
     {
         return _tokens;
     }
@@ -430,27 +452,67 @@ void parse_translation_unit(ParserState &state)
 void test_line_parsing(File &file, TranslationUnit &tu)
 {
     populate_translation_unit(file, tu);
-    assert(tu.lines[0].content == "// Copyright (c) 2023 Jean-François Boismenu\n");
-    assert(tu.lines[1].content == "\n");
-    assert(tu.lines[2].content == "int i = 0;\n");
-    assert(tu.lines[3].content == R"delim(const char *j = "this is a \n \" string";)delim" + std::string("\n"));
-    assert(tu.lines[4].content == "int k = 0x1234;\n");
-    assert(tu.lines[5].content == "char l = 'c';\n");
-    assert(tu.lines[6].content == "float d = 3.1416;\n");
-    assert(tu.lines[7].content == "bool m = true;\n");
-    assert(tu.lines[8].content == "");
+    luno_assert(tu.lines[0].content, ==, "// Copyright (c) 2023 Jean-François Boismenu\n");
+    luno_assert(tu.lines[1].content, ==, "\n");
+    luno_assert(tu.lines[2].content, ==, "int i = 0;\n");
+    luno_assert(tu.lines[3].content, ==, R"delim(const char *j = "this is a \n \" string";)delim" + std::string("\n"));
+    luno_assert(tu.lines[4].content, ==, "int k = 0x1234;\n");
+    luno_assert(tu.lines[5].content, ==, "char l = 'c';\n");
+    luno_assert(tu.lines[6].content, ==, "float d = 3.1416;\n");
+    luno_assert(tu.lines[7].content, ==, "bool m = true;\n");
+    luno_assert(tu.lines[8].content, ==, "");
     std::cout << "test_line_parsing passed!" << std::endl;
 }
 
 void test_tokenization(ParserState &state)
 {
     parse_translation_unit(state);
+
+    std::vector<std::string> result;
+    std::transform(state.get_tokens().begin(), state.get_tokens().end(), std::back_inserter(result),
+                   [](const Token &token) { return token.value(); });
+
+    const std::vector<std::string> expected({"// Copyright (c) 2023 Jean-François Boismenu",
+                                             "int",
+                                             "i",
+                                             "=",
+                                             "0",
+                                             ";",
+                                             "const",
+                                             "char",
+                                             "*",
+                                             "j",
+                                             "=",
+                                             "\"this is a \\n \\\" string\"",
+                                             ";",
+                                             "int",
+                                             "k",
+                                             "=",
+                                             "0x1234",
+                                             ";",
+                                             "char",
+                                             "l",
+                                             "=",
+                                             "'c'",
+                                             ";",
+                                             "float",
+                                             "d",
+                                             "=",
+                                             "3.1416",
+                                             ";",
+                                             "bool",
+                                             "m",
+                                             "=",
+                                             "true",
+                                             ";"});
+
+    luno_assert(result, ==, expected);
+
     std::cout << "test_tokenization passed!" << std::endl;
 }
 
 void run_tests()
 {
-
     const auto current_file = std::filesystem::path(__FILE__);
     const auto parent_folder = current_file.parent_path();
     const auto test_file = parent_folder / "test.cpp";
@@ -468,6 +530,14 @@ void run_tests()
 
 int main(int, char **argv)
 {
-    run_tests();
+    try
+    {
+        run_tests();
+    }
+    catch (std::runtime_error &ex)
+    {
+        std::cout << ex.what() << std::endl;
+        return 1;
+    }
     return 0;
 }
