@@ -12,12 +12,29 @@
 #include <string>
 #include <vector>
 
+std::string _repr(const std::string &value)
+{
+    std::ostringstream os;
+    os << '"' << value << '"';
+    return os.str();
+}
+
+template <typename T> const T &_repr(const T &value)
+{
+    return value;
+}
+
 template <typename T> std::ostream &operator<<(std::ostream &os, const std::vector<T> &items)
 {
-    for (auto const &item : items)
+    if (items.empty())
     {
-        os << item << ", ";
+        return os;
     }
+    for (auto it = items.begin(); it != items.end() - 1; ++it)
+    {
+        os << _repr(*it) << ", ";
+    }
+    os << _repr(items.back());
     return os;
 }
 
