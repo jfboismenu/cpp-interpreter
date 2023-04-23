@@ -7,7 +7,6 @@ namespace
 {
 using namespace luno;
 
-class ParserState;
 class PreprocessorState
 {
   public:
@@ -44,7 +43,7 @@ class StringOrCharacterState : public PreprocessorState
   public:
     StringOrCharacterState(char delimiter);
 
-    PreprocessorState *parse(ParserState &state);
+    PreprocessorState *parse(ParserState &state) override;
 
   private:
     const char _delimiter;
@@ -53,52 +52,95 @@ class StringOrCharacterState : public PreprocessorState
 StringOrCharacterState string_literal_state('"');
 StringOrCharacterState character_literal_state('\'');
 
-PreprocessorState *EmptyState::parse(ParserState &state){{const char c = state.parser.get_current_char();
-const int current_line = state.parser.current_line();
-const int current_column = state.parser.current_column();
-state.parser.advance();
+enum class CharacterType
+{
+    unsupported_character,
+    whitespace,
+    letter,
+    number,
+    punctuator,
+    other,
+};
 
-if (character_types[c] == CharacterType::whitespace)
+std::array<CharacterType, 128> initialize_character_types()
 {
-    return this;
-}
-else if (character_types[c] == CharacterType::letter or c == '_')
-{
-    state.current_token = Token(TokenType::identifier, c, current_line, current_column);
-    return &identifier;
-}
-else if (character_types[c] == CharacterType::number)
-{
-    state.current_token = Token(TokenType::number, c, current_line, current_column);
-    return &decimal_constant;
-}
-else if (c == '/' and state.parser.get_current_char() == '/')
-{
-    state.current_token = Token(TokenType::comment, c, current_line, current_column);
-    return &single_line_comment;
-}
-else if (c == '"')
-{
-    state.current_token = Token(TokenType::string_literal, c, current_line, current_column);
-    return &string_literal;
-}
-else if (c == '\'')
-{
-    state.current_token = Token(TokenType::character_constant, c, current_line, current_column);
-    return &character_literal;
-}
-else if (character_types[c] == CharacterType::punctuator)
-{
-    state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
-    state.flush_token();
-    return &empty_state;
+    std::array<CharacterType, 128> character_types;
+    for (auto &type : character_types)
+    {
+        type = CharacterType::unsupported_character;
+    }
+    for (auto letter = 'a'; letter <= 'z'; ++letter)
+    {
+        character_types[letter] = CharacterType::letter;
+    }
+    for (auto letter = 'A'; letter <= 'Z'; ++letter)
+    {
+        character_types[letter] = CharacterType::letter;
+    }
+    for (auto number = '0'; number <= '9'; ++number)
+    {
+        character_types[number] = CharacterType::number;
+    }
+    for (auto punctuator : "!%^&*()-+={}|~[\\;':\"<>?,./#)")
+    {
+        character_types[punctuator] = CharacterType::punctuator;
+    }
+    for (auto whitespace : " \t\n")
+    {
+        character_types[whitespace] = CharacterType::whitespace;
+    }
+
+    return character_types;
 }
 
-std::cout << c << std::endl;
-return &error_state;
-} // namespace
+std::array<CharacterType, 128> character_types = initialize_character_types();
+
+PreprocessorState *EmptyState::parse(ParserState &state)
+{
+    const char c = state.parser.get_current_char();
+    const int current_line = state.parser.current_line();
+    const int current_column = state.parser.current_column();
+    state.parser.advance();
+
+    if (character_types[c] == CharacterType::whitespace)
+    {
+        return this;
+    }
+    else if (character_types[c] == CharacterType::letter or c == '_')
+    {
+        state.current_token = Token(TokenType::identifier, c, current_line, current_column);
+        return &identifier_state;
+    }
+    else if (character_types[c] == CharacterType::number)
+    {
+        state.current_token = Token(TokenType::number, c, current_line, current_column);
+        return &decimal_state;
+    }
+    else if (c == '/' and state.parser.get_current_char() == '/')
+    {
+        state.current_token = Token(TokenType::comment, c, current_line, current_column);
+        return &single_line_comment_state;
+    }
+    else if (c == '"')
+    {
+        state.current_token = Token(TokenType::string_literal, c, current_line, current_column);
+        return &string_literal_state;
+    }
+    else if (c == '\'')
+    {
+        state.current_token = Token(TokenType::character_constant, c, current_line, current_column);
+        return &character_literal_state;
+    }
+    else if (character_types[c] == CharacterType::punctuator)
+    {
+        state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
+        state.flush_token();
+        return &empty_state;
+    }
+
+    std::cout << c << std::endl;
+    return &error_state;
 }
-;
 
 PreprocessorState *IdentifierState::parse(ParserState &state)
 {
@@ -108,11 +150,11 @@ PreprocessorState *IdentifierState::parse(ParserState &state)
     {
         state.current_token.append(c);
         state.parser.advance();
-        return PreprocessorState::identifier;
+        return this;
     }
     // Otherwise the identifier is over. We do not advance the parsing.
     state.flush_token();
-    return PreprocessorState::empty_state;
+    return &empty_state;
 }
 
 PreprocessorState *DecimalState::parse(ParserState &state)
@@ -131,13 +173,13 @@ PreprocessorState *DecimalState::parse(ParserState &state)
 
         // FIXME: When parsing an hexadecimal number, we can have + and -. We do
         // not support these at the moment.
-        return PreprocessorState::decimal_constant;
+        return this;
     }
 
     // We found a character that is not part of the number, so we're done.
     state.flush_token();
 
-    return PreprocessorState::empty_state;
+    return &empty_state;
 }
 
 PreprocessorState *SingleLineCommentState::parse(ParserState &state)
@@ -148,12 +190,12 @@ PreprocessorState *SingleLineCommentState::parse(ParserState &state)
     if (c == '\n')
     {
         state.flush_token();
-        return PreprocessorState::empty_state;
+        return &empty_state;
     }
     else
     {
         state.current_token.append(c);
-        return PreprocessorState::single_line_comment;
+        return this;
     }
 }
 
@@ -189,19 +231,20 @@ PreprocessorState *ErrorState::parse(ParserState &)
 {
     throw std::runtime_error("Unexpected compiler error.");
 }
-}
+} // namespace
 
 namespace luno
 {
 
-void parse_translation_unit(ParserState &state);
+void parse_translation_unit(ParserState &state)
 {
 
-    PreprocessorState *current = &initial_state;
+    PreprocessorState *current = &empty_state;
 
     while (!state.parser.is_finished())
     {
         current = current->parse(state);
     }
 }
+
 } // namespace luno

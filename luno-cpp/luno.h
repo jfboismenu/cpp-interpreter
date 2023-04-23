@@ -10,20 +10,11 @@
 
 namespace luno
 {
+
 class TranslationUnit
 {
   public:
     std::vector<Line> lines;
-};
-
-enum class CharacterType
-{
-    unsupported_character,
-    whitespace,
-    letter,
-    number,
-    punctuator,
-    other,
 };
 
 enum class TokenType
@@ -183,55 +174,4 @@ class ParserState
     std::vector<Token> _tokens;
 };
 
-std::array<CharacterType, 128> initialize_character_types()
-{
-    std::array<CharacterType, 128> character_types;
-    for (auto &type : character_types)
-    {
-        type = CharacterType::unsupported_character;
-    }
-    for (auto letter = 'a'; letter <= 'z'; ++letter)
-    {
-        character_types[letter] = CharacterType::letter;
-    }
-    for (auto letter = 'A'; letter <= 'Z'; ++letter)
-    {
-        character_types[letter] = CharacterType::letter;
-    }
-    for (auto number = '0'; number <= '9'; ++number)
-    {
-        character_types[number] = CharacterType::number;
-    }
-    for (auto punctuator : "!%^&*()-+={}|~[\\;':\"<>?,./#)")
-    {
-        character_types[punctuator] = CharacterType::punctuator;
-    }
-    for (auto whitespace : " \t\n")
-    {
-        character_types[whitespace] = CharacterType::whitespace;
-    }
-
-    return character_types;
-}
-
-std::array<CharacterType, 128> character_types = initialize_character_types();
-
-void populate_translation_unit(File &file, TranslationUnit &unit)
-{
-    char *start = file.content.data();
-    int line_no = 0;
-    for (size_t i = 0; i < file.content.size(); ++i)
-    {
-        if (file.content[i] == '\n')
-        {
-            std::string content(start, int(&file.content[i] - start + 1));
-            unit.lines.emplace_back(Line{&file, content, line_no});
-            ++line_no;
-            start = &file.content[i] + 1;
-        }
-    }
-    if (start < &file.content.back())
-    {
-        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start)), line_no});
-    }
-}
+} // namespace luno

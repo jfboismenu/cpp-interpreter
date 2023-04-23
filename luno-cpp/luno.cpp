@@ -19,6 +19,26 @@ namespace
 
 using namespace luno;
 
+void populate_translation_unit(File &file, TranslationUnit &unit)
+{
+    char *start = file.content.data();
+    int line_no = 0;
+    for (size_t i = 0; i < file.content.size(); ++i)
+    {
+        if (file.content[i] == '\n')
+        {
+            std::string content(start, int(&file.content[i] - start + 1));
+            unit.lines.emplace_back(Line{&file, content, line_no});
+            ++line_no;
+            start = &file.content[i] + 1;
+        }
+    }
+    if (start < &file.content.back())
+    {
+        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start)), line_no});
+    }
+}
+
 void test_line_parsing(File &file, TranslationUnit &tu)
 {
     populate_translation_unit(file, tu);
