@@ -2,6 +2,7 @@
 
 #include <luno-cpp/luno.h>
 #include <luno-cpp/preprocessor_states.h>
+#include <luno-cpp/token.h>
 
 namespace
 {

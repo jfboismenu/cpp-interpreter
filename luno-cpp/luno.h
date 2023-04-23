@@ -3,6 +3,7 @@
 #include <luno-cpp/file.h>
 #include <luno-cpp/line.h>
 #include <luno-cpp/preprocessor_states.h>
+#include <luno-cpp/token.h>
 
 #include <array>
 #include <iostream>
@@ -15,62 +16,6 @@ class TranslationUnit
 {
   public:
     std::vector<Line> lines;
-};
-
-enum class TokenType
-{
-    invalid,
-    header_name,
-    identifier,
-    comment,
-    number,
-    character_constant,
-    string_literal,
-    operator_,
-    punctuator,
-    other
-};
-
-class Token
-{
-  public:
-    Token() = default;
-    Token &operator=(const Token &) = default;
-    Token(TokenType type, char first_char, int line, int column)
-        : _value(1, first_char), _type(type), _line(line), _column(column)
-    {
-    }
-
-    void append(char c)
-    {
-        _value.push_back(c);
-    }
-
-    TokenType type() const
-    {
-        return _type;
-    }
-
-    int line() const
-    {
-        return _line;
-    }
-
-    int column() const
-    {
-        return _column;
-    }
-
-    std::string value() const
-    {
-        return _value;
-    }
-
-  private:
-    std::string _value;
-    int _line = 0;
-    int _column = 0;
-    TokenType _type = TokenType::invalid;
 };
 
 class Parser
