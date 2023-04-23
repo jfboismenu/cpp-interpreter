@@ -5,8 +5,8 @@
 namespace luno
 {
 
-class ParserState;
+class Lexer;
 
-void parse_translation_unit(ParserState &state);
+void parse_translation_unit(Lexer &state);
 
 } // namespace luno

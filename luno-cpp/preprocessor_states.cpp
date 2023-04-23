@@ -11,32 +11,32 @@ using namespace luno;
 class PreprocessorState
 {
   public:
-    virtual PreprocessorState *parse(ParserState &state) = 0;
+    virtual PreprocessorState *parse(Lexer &state) = 0;
 };
 
 class EmptyState : public PreprocessorState
 {
-    PreprocessorState *parse(ParserState &state) override;
+    PreprocessorState *parse(Lexer &state) override;
 } empty_state;
 
 class ErrorState : public PreprocessorState
 {
-    PreprocessorState *parse(ParserState &state) override;
+    PreprocessorState *parse(Lexer &state) override;
 } error_state;
 
 class IdentifierState : public PreprocessorState
 {
-    PreprocessorState *parse(ParserState &state) override;
+    PreprocessorState *parse(Lexer &state) override;
 } identifier_state;
 
 class DecimalState : public PreprocessorState
 {
-    PreprocessorState *parse(ParserState &state) override;
+    PreprocessorState *parse(Lexer &state) override;
 } decimal_state;
 
 class SingleLineCommentState : public PreprocessorState
 {
-    PreprocessorState *parse(ParserState &state) override;
+    PreprocessorState *parse(Lexer &state) override;
 } single_line_comment_state;
 
 class StringOrCharacterState : public PreprocessorState
@@ -44,7 +44,7 @@ class StringOrCharacterState : public PreprocessorState
   public:
     StringOrCharacterState(char delimiter);
 
-    PreprocessorState *parse(ParserState &state) override;
+    PreprocessorState *parse(Lexer &state) override;
 
   private:
     const char _delimiter;
@@ -96,7 +96,7 @@ std::array<CharacterType, 128> initialize_character_types()
 
 std::array<CharacterType, 128> character_types = initialize_character_types();
 
-PreprocessorState *EmptyState::parse(ParserState &state)
+PreprocessorState *EmptyState::parse(Lexer &state)
 {
     const char c = state.parser.get_current_char();
     const int current_line = state.parser.current_line();
@@ -143,7 +143,7 @@ PreprocessorState *EmptyState::parse(ParserState &state)
     return &error_state;
 }
 
-PreprocessorState *IdentifierState::parse(ParserState &state)
+PreprocessorState *IdentifierState::parse(Lexer &state)
 {
     // If the next character is letter, number or underscore, we're still parsing an identifier.
     const char c = state.parser.get_current_char();
@@ -158,7 +158,7 @@ PreprocessorState *IdentifierState::parse(ParserState &state)
     return &empty_state;
 }
 
-PreprocessorState *DecimalState::parse(ParserState &state)
+PreprocessorState *DecimalState::parse(Lexer &state)
 {
     const char c = state.parser.get_current_char();
 
@@ -183,7 +183,7 @@ PreprocessorState *DecimalState::parse(ParserState &state)
     return &empty_state;
 }
 
-PreprocessorState *SingleLineCommentState::parse(ParserState &state)
+PreprocessorState *SingleLineCommentState::parse(Lexer &state)
 {
     const char c = state.parser.get_current_char();
     state.parser.advance();
@@ -204,7 +204,7 @@ StringOrCharacterState::StringOrCharacterState(char delimiter) : _delimiter(deli
 {
 }
 
-PreprocessorState *StringOrCharacterState::parse(ParserState &state)
+PreprocessorState *StringOrCharacterState::parse(Lexer &state)
 {
     const char c = state.parser.get_current_char();
 
@@ -228,7 +228,7 @@ PreprocessorState *StringOrCharacterState::parse(ParserState &state)
     return this;
 }
 
-PreprocessorState *ErrorState::parse(ParserState &)
+PreprocessorState *ErrorState::parse(Lexer &)
 {
     throw std::runtime_error("Unexpected compiler error.");
 }
@@ -237,7 +237,7 @@ PreprocessorState *ErrorState::parse(ParserState &)
 namespace luno
 {
 
-void parse_translation_unit(ParserState &state)
+void parse_translation_unit(Lexer &state)
 {
 
     PreprocessorState *current = &empty_state;

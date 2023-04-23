@@ -93,10 +93,10 @@ class Parser
     int _current_column = 0;
 };
 
-class ParserState
+class Lexer
 {
   public:
-    ParserState(TranslationUnit &tu) : parser(tu)
+    Lexer(TranslationUnit &tu) : parser(tu)
     {
     }
 

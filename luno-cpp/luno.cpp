@@ -54,7 +54,7 @@ void test_line_parsing(File &file, TranslationUnit &tu)
     std::cout << "test_line_parsing passed!" << std::endl;
 }
 
-void test_tokenization(ParserState &state)
+void test_tokenization(Lexer &state)
 {
     parse_translation_unit(state);
 
@@ -112,7 +112,7 @@ void run_tests()
     TranslationUnit tu;
     test_line_parsing(file, tu);
 
-    ParserState state{ParserState(tu)};
+    Lexer state{Lexer(tu)};
     test_tokenization(state);
 }
 
