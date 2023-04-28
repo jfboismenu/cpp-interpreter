@@ -347,6 +347,10 @@ void parse_translation_unit(Lexer &state)
     {
         current = current->parse(state);
     }
+    if (!state.current_token.value().empty())
+    {
+        state.flush_token();
+    }
 }
 
 } // namespace luno

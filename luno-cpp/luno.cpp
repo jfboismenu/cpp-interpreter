@@ -55,8 +55,15 @@ std::vector<Line> split_text_into_lines(std::string &&text)
     return lines;
 }
 
-void test_line_parsing(const std::vector<Line> &lines)
+void test_line_parsing()
 {
+    const auto current_file = std::filesystem::path(__FILE__);
+    const auto parent_folder = current_file.parent_path();
+    const auto test_file = parent_folder / "test.cpp";
+
+    std::string text = read_file(test_file);
+    std::vector<Line> lines = split_text_into_lines(std::move(text));
+
     luno_assert(lines[0].content, ==, "// Copyright (c) 2023 Jean-François Boismenu\n");
     luno_assert(lines[1].content, ==, "\n");
     luno_assert(lines[2].content, ==, "int i = 0;\n");
@@ -69,65 +76,79 @@ void test_line_parsing(const std::vector<Line> &lines)
     std::cout << "test_line_parsing passed!" << std::endl;
 }
 
-void test_tokenization(Lexer &state)
+std::vector<std::string> _tokens_to_string(const std::vector<Token> &tokens)
 {
-    parse_translation_unit(state);
-
     std::vector<std::string> result;
-    std::transform(state.get_tokens().begin(), state.get_tokens().end(), std::back_inserter(result),
+    std::transform(tokens.begin(), tokens.end(), std::back_inserter(result),
                    [](const Token &token) { return token.value(); });
 
-    const std::vector<std::string> expected({"// Copyright (c) 2023 Jean-François Boismenu",
-                                             "int",
-                                             "i",
-                                             "=",
-                                             "0",
-                                             ";",
-                                             "const",
-                                             "char",
-                                             "*",
-                                             "j",
-                                             "=",
-                                             "\"this is a \\n \\\" string\"",
-                                             ";",
-                                             "int",
-                                             "k",
-                                             "=",
-                                             "0x1234",
-                                             ";",
-                                             "char",
-                                             "l",
-                                             "=",
-                                             "'c'",
-                                             ";",
-                                             "float",
-                                             "d",
-                                             "=",
-                                             "3.1416",
-                                             ";",
-                                             "bool",
-                                             "m",
-                                             "=",
-                                             "true",
-                                             ";"});
+    return result;
+}
 
-    luno_assert(result, ==, expected);
+void _test_tokenization(const std::string &code, const std::vector<std::string> &expected)
+{
+    Lexer lexer({Line{code, 0}});
+    parse_translation_unit(lexer);
+    luno_assert(_tokens_to_string(lexer.get_tokens()), ==, expected);
+}
+
+void test_tokenization()
+{
+
+    _test_tokenization("// Copyright (c) 2023 Jean-François Boismenu",
+                       {"// Copyright (c) 2023 Jean-François Boismenu"});
+
+    _test_tokenization("int i = 0;", {"int", "i", "=", "0", ";"});
+
+    _test_tokenization("const char *j = \"this is a \\n \\\" string\";",
+                       {"const", "char", "*", "j", "=", "\"this is a \\n \\\" string\"", ";"});
+
+    _test_tokenization("int k = 0x1234;", {"int", "k", "=", "0x1234", ";"});
+    _test_tokenization("char l = 'c';", {"char", "l", "=", "'c'", ";"});
+    _test_tokenization("float d = 3.1416;", {"float", "d", "=", "3.1416", ";"});
+    _test_tokenization("bool m = true;", {"bool", "m", "=", "true", ";"});
+
+    _test_tokenization("+++++", {"++", "++", "+"});
+    _test_tokenization(":::::", {"::", "::", ":"});
+    _test_tokenization("-----", {"--", "--", "-"});
+    _test_tokenization("&&&&&", {"&&", "&&", "&"});
+    _test_tokenization("|||||", {"||", "||", "|"});
+    _test_tokenization("=====", {"==", "==", "="});
+    _test_tokenization("<<<<<", {"<<", "<<", "<"});
+    _test_tokenization(">>>>>", {">>", ">>", ">"});
+    _test_tokenization("<<<<=<", {"<<", "<<=", "<"});
+    _test_tokenization(">>>>=>", {">>", ">>=", ">"});
+    _test_tokenization("a|=b", {"a", "|=", "b"});
+    _test_tokenization("a+=b", {"a", "+=", "b"});
+    _test_tokenization("a-=b", {"a", "-=", "b"});
+    _test_tokenization("a*=b", {"a", "*=", "b"});
+    _test_tokenization("a/=b", {"a", "/=", "b"});
+    _test_tokenization("a!=b", {"a", "!=", "b"});
+    _test_tokenization("a~=b", {"a", "~=", "b"});
+    _test_tokenization("a&=b", {"a", "&=", "b"});
+    _test_tokenization("a%=b", {"a", "%=", "b"});
+    _test_tokenization("a^=b", {"a", "^=", "b"});
+    _test_tokenization("a:b", {"a", ":", "b"});
+    _test_tokenization("a=b", {"a", "=", "b"});
+    _test_tokenization("a+b", {"a", "+", "b"});
+    _test_tokenization("a-b", {"a", "-", "b"});
+    _test_tokenization("a|b", {"a", "|", "b"});
+    _test_tokenization("a&b", {"a", "&", "b"});
+    _test_tokenization("a!b", {"a", "!", "b"});
+    _test_tokenization("a~b", {"a", "~", "b"});
+    _test_tokenization("a%b", {"a", "%", "b"});
+    _test_tokenization("a^b", {"a", "^", "b"});
+    _test_tokenization("a*b", {"a", "*", "b"});
+    _test_tokenization("a/b", {"a", "/", "b"});
 
     std::cout << "test_tokenization passed!" << std::endl;
 }
 
 void run_tests()
 {
-    const auto current_file = std::filesystem::path(__FILE__);
-    const auto parent_folder = current_file.parent_path();
-    const auto test_file = parent_folder / "test.cpp";
+    test_line_parsing();
 
-    std::string text = read_file(test_file);
-    std::vector<Line> lines = split_text_into_lines(std::move(text));
-    test_line_parsing(lines);
-
-    Lexer lexer{std::move(lines)};
-    test_tokenization(lexer);
+    test_tokenization();
 }
 
 } // namespace
