@@ -50,6 +50,11 @@ class ThreeCharPunctuatorState : public LexerState
     LexerState *parse(Lexer &state) override;
 } three_char_punctuator_state;
 
+class ArrowOperatorState : public LexerState
+{
+    LexerState *parse(Lexer &state) override;
+} arrow_operator_state;
+
 class StringOrCharacterState : public LexerState
 {
   public:
@@ -95,7 +100,7 @@ std::array<CharacterType, 128> initialize_character_types()
     {
         character_types[number] = CharacterType::number;
     }
-    for (auto punctuator : ":=+-|&!~%^*/")
+    for (auto punctuator : ":=+-|&!~%^*/.")
     {
         character_types[punctuator] = CharacterType::two_char_punctuator;
     }
@@ -103,7 +108,7 @@ std::array<CharacterType, 128> initialize_character_types()
     {
         character_types[punctuator] = CharacterType::three_char_punctuator;
     }
-    for (auto punctuator : "(){}[\\;?,.")
+    for (auto punctuator : "(){}[\\;?,")
     {
         character_types[punctuator] = CharacterType::single_char_punctuator;
     }
@@ -265,6 +270,13 @@ LexerState *TwoCharPunctuatorState::parse(Lexer &state)
 
     switch (first_char)
     {
+    case '.': {
+        if (next_char == '*')
+        {
+            state.iterator.advance();
+            state.current_token.append(next_char);
+        }
+    }
     case ':':
     case '=': {
         if (next_char == first_char)
@@ -276,7 +288,6 @@ LexerState *TwoCharPunctuatorState::parse(Lexer &state)
     break;
 
     case '+':
-    case '-':
     case '|':
     case '&': {
         if (first_char == next_char || next_char == '=')
@@ -286,6 +297,20 @@ LexerState *TwoCharPunctuatorState::parse(Lexer &state)
         }
     }
     break;
+
+    case '-': {
+        if (first_char == next_char || next_char == '=')
+        {
+            state.iterator.advance();
+            state.current_token.append(next_char);
+        }
+        else if (next_char == '>')
+        {
+            state.iterator.advance();
+            state.current_token.append(next_char);
+            return &arrow_operator_state;
+        }
+    }
 
     case '!':
     case '~':
@@ -302,6 +327,18 @@ LexerState *TwoCharPunctuatorState::parse(Lexer &state)
     break;
     }
 
+    state.flush_token();
+    return &empty_state;
+}
+
+LexerState *ArrowOperatorState::parse(Lexer &state)
+{
+    const char next_char = state.iterator.get_current_char();
+    if (next_char == '*')
+    {
+        state.current_token.append(next_char);
+        state.iterator.advance();
+    }
     state.flush_token();
     return &empty_state;
 }

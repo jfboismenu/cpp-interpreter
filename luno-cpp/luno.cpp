@@ -108,6 +108,11 @@ void test_tokenization()
     _test_tokenization("float d = 3.1416;", {"float", "d", "=", "3.1416", ";"});
     _test_tokenization("bool m = true;", {"bool", "m", "=", "true", ";"});
 
+    _test_tokenization("((a))", {"(", "(", "a", ")", ")"});
+    _test_tokenization("[[a]]", {"[", "[", "a", "]", "]"});
+    _test_tokenization(",,,", {",", ",", ","});
+    _test_tokenization("???", {"?", "?", "?"});
+    _test_tokenization("a.b", {"a", ".", "b"});
     _test_tokenization("+++++", {"++", "++", "+"});
     _test_tokenization(":::::", {"::", "::", ":"});
     _test_tokenization("-----", {"--", "--", "-"});
@@ -140,6 +145,10 @@ void test_tokenization()
     _test_tokenization("a^b", {"a", "^", "b"});
     _test_tokenization("a*b", {"a", "*", "b"});
     _test_tokenization("a/b", {"a", "/", "b"});
+    _test_tokenization("a/b", {"a", "/", "b"});
+    _test_tokenization("a->b", {"a", "->", "b"});
+    _test_tokenization("a.*b", {"a", ".*", "b"});
+    _test_tokenization("a->*b", {"a", ".>*", "b"});
 
     std::cout << "test_tokenization passed!" << std::endl;
 }
