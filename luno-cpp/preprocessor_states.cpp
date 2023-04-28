@@ -1,5 +1,6 @@
 // Copyright (c) 2023 Jean-François Boismenu
 
+#include <luno-cpp/assert.h>
 #include <luno-cpp/luno.h>
 #include <luno-cpp/preprocessor_states.h>
 #include <luno-cpp/token.h>
@@ -39,6 +40,16 @@ class SingleLineCommentState : public LexerState
     LexerState *parse(Lexer &state) override;
 } single_line_comment_state;
 
+class TwoCharPunctuatorState : public LexerState
+{
+    LexerState *parse(Lexer &state) override;
+} two_char_punctuator_state;
+
+class ThreeCharPunctuatorState : public LexerState
+{
+    LexerState *parse(Lexer &state) override;
+} three_char_punctuator_state;
+
 class StringOrCharacterState : public LexerState
 {
   public:
@@ -59,7 +70,9 @@ enum class CharacterType
     whitespace,
     letter,
     number,
-    punctuator,
+    single_char_punctuator,
+    two_char_punctuator,
+    three_char_punctuator,
     other,
 };
 
@@ -82,9 +95,17 @@ std::array<CharacterType, 128> initialize_character_types()
     {
         character_types[number] = CharacterType::number;
     }
-    for (auto punctuator : "!%^&*()-+={}|~[\\;':\"<>?,./#)")
+    for (auto punctuator : ":=+-|&!~%^*/")
     {
-        character_types[punctuator] = CharacterType::punctuator;
+        character_types[punctuator] = CharacterType::two_char_punctuator;
+    }
+    for (auto punctuator : "<>")
+    {
+        character_types[punctuator] = CharacterType::three_char_punctuator;
+    }
+    for (auto punctuator : "(){}[\\;?,.")
+    {
+        character_types[punctuator] = CharacterType::single_char_punctuator;
     }
     for (auto whitespace : " \t\n")
     {
@@ -132,14 +153,22 @@ LexerState *EmptyState::parse(Lexer &state)
         state.current_token = Token(TokenType::character_constant, c, current_line, current_column);
         return &character_literal_state;
     }
-    else if (character_types[c] == CharacterType::punctuator)
+    else if (character_types[c] == CharacterType::two_char_punctuator)
+    {
+        state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
+        return &two_char_punctuator_state;
+    }
+    else if (character_types[c] == CharacterType::three_char_punctuator)
+    {
+        state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
+        return &three_char_punctuator_state;
+    }
+    else if (character_types[c] == CharacterType::single_char_punctuator)
     {
         state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
         state.flush_token();
         return &empty_state;
     }
-
-    std::cout << c << std::endl;
     return &error_state;
 }
 
@@ -226,6 +255,78 @@ LexerState *StringOrCharacterState::parse(Lexer &state)
     }
     state.current_token.append(c);
     return this;
+}
+
+LexerState *TwoCharPunctuatorState::parse(Lexer &state)
+{
+    ;
+    const char first_char = state.current_token.value()[0];
+    const char next_char = state.iterator.get_current_char();
+
+    switch (first_char)
+    {
+    case ':':
+    case '=': {
+        if (next_char == first_char)
+        {
+            state.iterator.advance();
+            state.current_token.append(next_char);
+        }
+    }
+    break;
+
+    case '+':
+    case '-':
+    case '|':
+    case '&': {
+        if (first_char == next_char || next_char == '=')
+        {
+            state.iterator.advance();
+            state.current_token.append(next_char);
+        }
+    }
+    break;
+
+    case '!':
+    case '~':
+    case '%':
+    case '^':
+    case '*':
+    case '/': {
+        if (next_char == '=')
+        {
+            state.iterator.advance();
+            state.current_token.append(next_char);
+        }
+    }
+    break;
+    }
+
+    state.flush_token();
+    return &empty_state;
+}
+
+LexerState *ThreeCharPunctuatorState::parse(Lexer &state)
+{
+    const char first_char = state.current_token.value()[0];
+    const char next_char = state.iterator.get_current_char();
+
+    if (next_char == '=')
+    {
+        state.iterator.advance();
+        state.current_token.append(next_char);
+        state.flush_token();
+        ;
+        return &empty_state;
+    }
+    if (next_char == first_char && state.current_token.value().size() == 1)
+    {
+        state.iterator.advance();
+        state.current_token.append(next_char);
+        return &three_char_punctuator_state;
+    }
+    state.flush_token();
+    return &empty_state;
 }
 
 LexerState *ErrorState::parse(Lexer &)

@@ -99,7 +99,6 @@ class Lexer
     void flush_token()
     {
         _tokens.emplace_back(current_token);
-        std::cout << current_token.value() << std::endl;
         current_token = Token();
     }
 
