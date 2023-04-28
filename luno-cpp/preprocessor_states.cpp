@@ -8,43 +8,43 @@ namespace
 {
 using namespace luno;
 
-class PreprocessorState
+class LexerState
 {
   public:
-    virtual PreprocessorState *parse(Lexer &state) = 0;
+    virtual LexerState *parse(Lexer &state) = 0;
 };
 
-class EmptyState : public PreprocessorState
+class EmptyState : public LexerState
 {
-    PreprocessorState *parse(Lexer &state) override;
+    LexerState *parse(Lexer &state) override;
 } empty_state;
 
-class ErrorState : public PreprocessorState
+class ErrorState : public LexerState
 {
-    PreprocessorState *parse(Lexer &state) override;
+    LexerState *parse(Lexer &state) override;
 } error_state;
 
-class IdentifierState : public PreprocessorState
+class IdentifierState : public LexerState
 {
-    PreprocessorState *parse(Lexer &state) override;
+    LexerState *parse(Lexer &state) override;
 } identifier_state;
 
-class DecimalState : public PreprocessorState
+class DecimalState : public LexerState
 {
-    PreprocessorState *parse(Lexer &state) override;
+    LexerState *parse(Lexer &state) override;
 } decimal_state;
 
-class SingleLineCommentState : public PreprocessorState
+class SingleLineCommentState : public LexerState
 {
-    PreprocessorState *parse(Lexer &state) override;
+    LexerState *parse(Lexer &state) override;
 } single_line_comment_state;
 
-class StringOrCharacterState : public PreprocessorState
+class StringOrCharacterState : public LexerState
 {
   public:
     StringOrCharacterState(char delimiter);
 
-    PreprocessorState *parse(Lexer &state) override;
+    LexerState *parse(Lexer &state) override;
 
   private:
     const char _delimiter;
@@ -96,12 +96,12 @@ std::array<CharacterType, 128> initialize_character_types()
 
 std::array<CharacterType, 128> character_types = initialize_character_types();
 
-PreprocessorState *EmptyState::parse(Lexer &state)
+LexerState *EmptyState::parse(Lexer &state)
 {
-    const char c = state.parser.get_current_char();
-    const int current_line = state.parser.current_line();
-    const int current_column = state.parser.current_column();
-    state.parser.advance();
+    const char c = state.iterator.get_current_char();
+    const int current_line = state.iterator.current_line();
+    const int current_column = state.iterator.current_column();
+    state.iterator.advance();
 
     if (character_types[c] == CharacterType::whitespace)
     {
@@ -117,7 +117,7 @@ PreprocessorState *EmptyState::parse(Lexer &state)
         state.current_token = Token(TokenType::number, c, current_line, current_column);
         return &decimal_state;
     }
-    else if (c == '/' and state.parser.get_current_char() == '/')
+    else if (c == '/' and state.iterator.get_current_char() == '/')
     {
         state.current_token = Token(TokenType::comment, c, current_line, current_column);
         return &single_line_comment_state;
@@ -143,14 +143,14 @@ PreprocessorState *EmptyState::parse(Lexer &state)
     return &error_state;
 }
 
-PreprocessorState *IdentifierState::parse(Lexer &state)
+LexerState *IdentifierState::parse(Lexer &state)
 {
     // If the next character is letter, number or underscore, we're still parsing an identifier.
-    const char c = state.parser.get_current_char();
+    const char c = state.iterator.get_current_char();
     if (character_types[c] == CharacterType::letter || character_types[c] == CharacterType::number or c == '_')
     {
         state.current_token.append(c);
-        state.parser.advance();
+        state.iterator.advance();
         return this;
     }
     // Otherwise the identifier is over. We do not advance the parsing.
@@ -158,9 +158,9 @@ PreprocessorState *IdentifierState::parse(Lexer &state)
     return &empty_state;
 }
 
-PreprocessorState *DecimalState::parse(Lexer &state)
+LexerState *DecimalState::parse(Lexer &state)
 {
-    const char c = state.parser.get_current_char();
+    const char c = state.iterator.get_current_char();
 
     if (character_types[c] == CharacterType::number || c == '.' || c == 'x' || c == 'X' || ('0' <= c && c <= '9') ||
         ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'))
@@ -169,7 +169,7 @@ PreprocessorState *DecimalState::parse(Lexer &state)
         // one while we remain in the same state. This can yield an invalid token
         // but we're not going to care for that. Once we validate our tokens
         // during the next pass we'll see right away that is was invalid.
-        state.parser.advance();
+        state.iterator.advance();
         state.current_token.append(c);
 
         // FIXME: When parsing an hexadecimal number, we can have + and -. We do
@@ -183,10 +183,10 @@ PreprocessorState *DecimalState::parse(Lexer &state)
     return &empty_state;
 }
 
-PreprocessorState *SingleLineCommentState::parse(Lexer &state)
+LexerState *SingleLineCommentState::parse(Lexer &state)
 {
-    const char c = state.parser.get_current_char();
-    state.parser.advance();
+    const char c = state.iterator.get_current_char();
+    state.iterator.advance();
 
     if (c == '\n')
     {
@@ -204,13 +204,13 @@ StringOrCharacterState::StringOrCharacterState(char delimiter) : _delimiter(deli
 {
 }
 
-PreprocessorState *StringOrCharacterState::parse(Lexer &state)
+LexerState *StringOrCharacterState::parse(Lexer &state)
 {
-    const char c = state.parser.get_current_char();
+    const char c = state.iterator.get_current_char();
 
     // We're inside a string, so whatever the character is, we're adding it to
     // the literal.
-    state.parser.advance();
+    state.iterator.advance();
     // We are closing the string only if the previous character wasn't
     // a backslash.
     if (c == _delimiter && state.current_token.value().back() != '\\')
@@ -228,7 +228,7 @@ PreprocessorState *StringOrCharacterState::parse(Lexer &state)
     return this;
 }
 
-PreprocessorState *ErrorState::parse(Lexer &)
+LexerState *ErrorState::parse(Lexer &)
 {
     throw std::runtime_error("Unexpected compiler error.");
 }
@@ -240,9 +240,9 @@ namespace luno
 void parse_translation_unit(Lexer &state)
 {
 
-    PreprocessorState *current = &empty_state;
+    LexerState *current = &empty_state;
 
-    while (!state.parser.is_finished())
+    while (!state.iterator.is_finished())
     {
         current = current->parse(state);
     }

@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Jean-François Boismenu
 
 #include <luno-cpp/assert.h>
-#include <luno-cpp/file.h>
 #include <luno-cpp/line.h>
 #include <luno-cpp/luno.h>
 
@@ -19,38 +18,54 @@ namespace
 
 using namespace luno;
 
-void populate_translation_unit(File &file, TranslationUnit &unit)
+std::string read_file(const std::filesystem::path &path)
 {
-    char *start = file.content.data();
-    int line_no = 0;
-    for (size_t i = 0; i < file.content.size(); ++i)
-    {
-        if (file.content[i] == '\n')
-        {
-            std::string content(start, int(&file.content[i] - start + 1));
-            unit.lines.emplace_back(Line{&file, content, line_no});
-            ++line_no;
-            start = &file.content[i] + 1;
-        }
-    }
-    if (start < &file.content.back())
-    {
-        unit.lines.emplace_back(Line{&file, std::string(start, int(&file.content.back() - start)), line_no});
-    }
+    std::ifstream file(path.c_str());
+    assert(file.is_open());
+
+    const size_t size = file.seekg(0, std::ios_base::end).tellg();
+    file.seekg(0, std::ios_base::beg);
+    std::string content(size, 0);
+    file.read(&content[0], size);
+
+    return content;
 }
 
-void test_line_parsing(File &file, TranslationUnit &tu)
+std::vector<Line> split_text_into_lines(std::string &&text)
 {
-    populate_translation_unit(file, tu);
-    luno_assert(tu.lines[0].content, ==, "// Copyright (c) 2023 Jean-François Boismenu\n");
-    luno_assert(tu.lines[1].content, ==, "\n");
-    luno_assert(tu.lines[2].content, ==, "int i = 0;\n");
-    luno_assert(tu.lines[3].content, ==, R"delim(const char *j = "this is a \n \" string";)delim" + std::string("\n"));
-    luno_assert(tu.lines[4].content, ==, "int k = 0x1234;\n");
-    luno_assert(tu.lines[5].content, ==, "char l = 'c';\n");
-    luno_assert(tu.lines[6].content, ==, "float d = 3.1416;\n");
-    luno_assert(tu.lines[7].content, ==, "bool m = true;\n");
-    luno_assert(tu.lines[8].content, ==, "");
+    std::vector<Line> lines;
+    int line_number = 0;
+
+    char *start = &text.front();
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        if (text[i] == '\n')
+        {
+            std::string line(start, int(&text[i] - start + 1));
+            lines.emplace_back(Line{line, line_number});
+            ++line_number;
+            start = &text[i] + 1;
+        }
+    }
+
+    if (start < &text.back())
+    {
+        lines.emplace_back(Line{std::string(start, int(&text.back() - start)), line_number});
+    }
+    return lines;
+}
+
+void test_line_parsing(const std::vector<Line> &lines)
+{
+    luno_assert(lines[0].content, ==, "// Copyright (c) 2023 Jean-François Boismenu\n");
+    luno_assert(lines[1].content, ==, "\n");
+    luno_assert(lines[2].content, ==, "int i = 0;\n");
+    luno_assert(lines[3].content, ==, R"delim(const char *j = "this is a \n \" string";)delim" + std::string("\n"));
+    luno_assert(lines[4].content, ==, "int k = 0x1234;\n");
+    luno_assert(lines[5].content, ==, "char l = 'c';\n");
+    luno_assert(lines[6].content, ==, "float d = 3.1416;\n");
+    luno_assert(lines[7].content, ==, "bool m = true;\n");
+    luno_assert(lines[8].content, ==, "");
     std::cout << "test_line_parsing passed!" << std::endl;
 }
 
@@ -107,13 +122,12 @@ void run_tests()
     const auto parent_folder = current_file.parent_path();
     const auto test_file = parent_folder / "test.cpp";
 
-    File file(File::read_file(test_file.c_str()));
+    std::string text = read_file(test_file);
+    std::vector<Line> lines = split_text_into_lines(std::move(text));
+    test_line_parsing(lines);
 
-    TranslationUnit tu;
-    test_line_parsing(file, tu);
-
-    Lexer state{Lexer(tu)};
-    test_tokenization(state);
+    Lexer lexer{std::move(lines)};
+    test_tokenization(lexer);
 }
 
 } // namespace

@@ -29,13 +29,20 @@ template <typename T> std::ostream &operator<<(std::ostream &os, const std::vect
     return os;
 }
 
+#define luno_throw(exc_type, expr)                                                                                     \
+    std::cout << "Exception raise in " << __FILE__ << " at " << __LINE__ << std::endl;                                 \
+    std::ostringstream os;                                                                                             \
+    os << expr;                                                                                                        \
+    throw exc_type(os.str())
+
 #define luno_assert(lfs, comp, rhs)                                                                                    \
     {                                                                                                                  \
         if (!((lfs)comp(rhs)))                                                                                         \
         {                                                                                                              \
-            std::ostringstream os;                                                                                     \
             const std::string comparator(#comp);                                                                       \
-            os << (lfs) << std::endl << comparator << std::endl << (rhs) << std::endl << " failed!";                   \
-            throw std::runtime_error(os.str());                                                                        \
+            luno_throw(std::runtime_error, (lfs) << std::endl                                                          \
+                                                 << comparator << std::endl                                            \
+                                                 << (rhs) << std::endl                                                 \
+                                                 << " failed!");                                                       \
         }                                                                                                              \
     }

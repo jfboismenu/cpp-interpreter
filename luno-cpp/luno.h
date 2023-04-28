@@ -1,6 +1,5 @@
 // Copyright (c) 2023 Jean-François Boismenu
 
-#include <luno-cpp/file.h>
 #include <luno-cpp/line.h>
 #include <luno-cpp/preprocessor_states.h>
 #include <luno-cpp/token.h>
@@ -12,33 +11,27 @@
 namespace luno
 {
 
-class TranslationUnit
+class FileIterator
 {
   public:
-    std::vector<Line> lines;
-};
-
-class Parser
-{
-  public:
-    Parser(TranslationUnit &tu) : _tu(tu)
+    FileIterator(std::vector<Line> &&lines) : _lines(lines)
     {
     }
 
     char get_current_char()
     {
         // If we're already at the end of the file, just return a whitespace.
-        if (_current_line == _tu.lines.size())
+        if (_current_line == _lines.size())
         {
             return '\0';
         }
-        return _tu.lines[_current_line].content[_current_column];
+        return _lines[_current_line].content[_current_column];
     }
 
     char peek_next_char()
     {
         // If we're already at the end of the file, just return a whitespace.
-        if (_current_line == _tu.lines.size())
+        if (_current_line == _lines.size())
         {
             return '\0';
         }
@@ -57,7 +50,7 @@ class Parser
 
     void advance()
     {
-        if (_current_line == _tu.lines.size())
+        if (_current_line == _lines.size())
         {
             return;
         }
@@ -65,7 +58,7 @@ class Parser
         ++_current_column;
 
         // If we've hit the end of the line, move on to the next line.
-        if (_tu.lines[_current_line].content.size() == _current_column)
+        if (_lines[_current_line].content.size() == _current_column)
         {
             _current_column = 0;
             _current_line += 1;
@@ -79,16 +72,16 @@ class Parser
 
     int current_column() const
     {
-        return _current_column;
+        return _lines[_current_line].line_number;
     }
 
     bool is_finished() const
     {
-        return _current_line == _tu.lines.size();
+        return _current_line == _lines.size();
     }
 
   private:
-    TranslationUnit &_tu;
+    const std::vector<Line> _lines;
     int _current_line = 0;
     int _current_column = 0;
 };
@@ -96,11 +89,11 @@ class Parser
 class Lexer
 {
   public:
-    Lexer(TranslationUnit &tu) : parser(tu)
+    Lexer(std::vector<Line> &&lines) : iterator(std::move(lines))
     {
     }
 
-    Parser parser;
+    FileIterator iterator;
     Token current_token;
 
     void flush_token()
