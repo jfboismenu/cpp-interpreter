@@ -108,7 +108,7 @@ std::array<CharacterType, 128> initialize_character_types()
     {
         character_types[punctuator] = CharacterType::three_char_punctuator;
     }
-    for (auto punctuator : "(){}[\\;?,")
+    for (auto punctuator : "(){}[]\\;?,")
     {
         character_types[punctuator] = CharacterType::single_char_punctuator;
     }
@@ -311,6 +311,7 @@ LexerState *TwoCharPunctuatorState::parse(Lexer &state)
             return &arrow_operator_state;
         }
     }
+    break;
 
     case '!':
     case '~':

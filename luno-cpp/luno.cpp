@@ -148,7 +148,7 @@ void test_tokenization()
     _test_tokenization("a/b", {"a", "/", "b"});
     _test_tokenization("a->b", {"a", "->", "b"});
     _test_tokenization("a.*b", {"a", ".*", "b"});
-    _test_tokenization("a->*b", {"a", ".>*", "b"});
+    _test_tokenization("a->*b", {"a", "->*", "b"});
 
     std::cout << "test_tokenization passed!" << std::endl;
 }
