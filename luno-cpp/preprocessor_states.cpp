@@ -15,10 +15,15 @@ class LexerState
     virtual LexerState *parse(Lexer &state) = 0;
 };
 
-class EmptyState : public LexerState
+class LineBeginningState : public LexerState
 {
     LexerState *parse(Lexer &state) override;
-} empty_state;
+} line_beginning_state;
+
+class MiddleState : public LexerState
+{
+    LexerState *parse(Lexer &state) override;
+} middle_state;
 
 class ErrorState : public LexerState
 {
@@ -127,7 +132,18 @@ std::array<CharacterType, 128> initialize_character_types()
 
 std::array<CharacterType, 128> character_types = initialize_character_types();
 
-LexerState *EmptyState::parse(Lexer &state)
+LexerState *LineBeginningState::parse(Lexer &state)
+{
+    const char c = state.iterator.get_current_char();
+    if (character_types[c] == CharacterType::whitespace)
+    {
+        state.iterator.advance();
+        return this;
+    }
+    return &middle_state;
+}
+
+LexerState *MiddleState::parse(Lexer &state)
 {
     const char c = state.iterator.get_current_char();
     const int current_line = state.iterator.current_line();
@@ -184,7 +200,7 @@ LexerState *EmptyState::parse(Lexer &state)
     {
         state.current_token = Token(TokenType::punctuator, c, current_line, current_column);
         state.flush_token();
-        return &empty_state;
+        return this;
     }
     return &error_state;
 }
@@ -201,7 +217,7 @@ LexerState *IdentifierState::parse(Lexer &state)
     }
     // Otherwise the identifier is over. We do not advance the parsing.
     state.flush_token();
-    return &empty_state;
+    return &middle_state;
 }
 
 LexerState *DecimalState::parse(Lexer &state)
@@ -226,7 +242,7 @@ LexerState *DecimalState::parse(Lexer &state)
     // We found a character that is not part of the number, so we're done.
     state.flush_token();
 
-    return &empty_state;
+    return &middle_state;
 }
 
 LexerState *SingleLineCommentState::parse(Lexer &state)
@@ -234,28 +250,15 @@ LexerState *SingleLineCommentState::parse(Lexer &state)
     const char c = state.iterator.get_current_char();
     state.iterator.advance();
 
-    if (c == '\n')
-    {
-        state.flush_token();
-        return &empty_state;
-    }
-    else
-    {
-        state.current_token.append(c);
-        return this;
-    }
+    state.current_token.append(c);
+    return this;
 }
 
 LexerState *MultilineCommentState::parse(Lexer &state)
 {
     const char c = state.iterator.get_current_char();
     state.iterator.advance();
-    if (c == '\n')
-    {
-        return this;
-    }
 
-    // We don't have a \n, so we can add it.
     state.current_token.append(c);
     // If the character that was just added was a * and the next is /, then we've
     // closed the comment.
@@ -264,7 +267,7 @@ LexerState *MultilineCommentState::parse(Lexer &state)
         state.current_token.append(state.iterator.get_current_char());
         state.iterator.advance();
         state.flush_token();
-        return &empty_state;
+        return &middle_state;
     }
 
     return this;
@@ -287,12 +290,7 @@ LexerState *StringOrCharacterState::parse(Lexer &state)
     {
         state.current_token.append(c);
         state.flush_token();
-        return &empty_state;
-    }
-    if (c == '\n')
-    {
-        state.flush_token();
-        return &empty_state;
+        return &middle_state;
     }
     state.current_token.append(c);
     return this;
@@ -365,7 +363,7 @@ LexerState *TwoCharPunctuatorState::parse(Lexer &state)
     }
 
     state.flush_token();
-    return &empty_state;
+    return &middle_state;
 }
 
 LexerState *ArrowOperatorState::parse(Lexer &state)
@@ -377,7 +375,7 @@ LexerState *ArrowOperatorState::parse(Lexer &state)
         state.iterator.advance();
     }
     state.flush_token();
-    return &empty_state;
+    return &middle_state;
 }
 
 LexerState *ThreeCharPunctuatorState::parse(Lexer &state)
@@ -390,8 +388,7 @@ LexerState *ThreeCharPunctuatorState::parse(Lexer &state)
         state.iterator.advance();
         state.current_token.append(next_char);
         state.flush_token();
-        ;
-        return &empty_state;
+        return &middle_state;
     }
     if (next_char == first_char && state.current_token.value().size() == 1)
     {
@@ -400,7 +397,7 @@ LexerState *ThreeCharPunctuatorState::parse(Lexer &state)
         return &three_char_punctuator_state;
     }
     state.flush_token();
-    return &empty_state;
+    return &middle_state;
 }
 
 LexerState *ErrorState::parse(Lexer &)
@@ -415,11 +412,24 @@ namespace luno
 void parse_translation_unit(Lexer &state)
 {
 
-    LexerState *current = &empty_state;
+    LexerState *current = &line_beginning_state;
 
     while (!state.iterator.is_finished())
     {
         current = current->parse(state);
+        if (state.iterator.get_current_char() == '\n')
+        {
+            // Unless we're in a multiline comment, we reset the state.
+            if (current != &multi_line_comment_state)
+            {
+                if (!state.current_token.value().empty())
+                {
+                    state.flush_token();
+                }
+                current = &line_beginning_state;
+            }
+            state.iterator.advance();
+        }
     }
     if (!state.current_token.value().empty())
     {
