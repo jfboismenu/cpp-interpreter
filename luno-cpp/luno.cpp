@@ -94,9 +94,10 @@ void _test_tokenization(const std::string &code, const std::vector<std::string> 
 
 void test_tokenization()
 {
-
     _test_tokenization("// Copyright (c) 2023 Jean-François Boismenu",
                        {"// Copyright (c) 2023 Jean-François Boismenu"});
+    _test_tokenization("int/*hello*/ world /* this is a multi*\nline comment*/",
+                       {"int", "/*hello*/", "world", "/* this is a multi*line comment*/"});
 
     _test_tokenization("int i = 0;", {"int", "i", "=", "0", ";"});
 

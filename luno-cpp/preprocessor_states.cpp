@@ -40,6 +40,11 @@ class SingleLineCommentState : public LexerState
     LexerState *parse(Lexer &state) override;
 } single_line_comment_state;
 
+class MultilineCommentState : public LexerState
+{
+    LexerState *parse(Lexer &state) override;
+} multi_line_comment_state;
+
 class TwoCharPunctuatorState : public LexerState
 {
     LexerState *parse(Lexer &state) override;
@@ -143,10 +148,17 @@ LexerState *EmptyState::parse(Lexer &state)
         state.current_token = Token(TokenType::number, c, current_line, current_column);
         return &decimal_state;
     }
-    else if (c == '/' and state.iterator.get_current_char() == '/')
+    else if (c == '/' && state.iterator.get_current_char() == '/')
     {
         state.current_token = Token(TokenType::comment, c, current_line, current_column);
         return &single_line_comment_state;
+    }
+    else if (c == '/' && state.iterator.get_current_char() == '*')
+    {
+        state.current_token = Token(TokenType::comment, c, current_line, current_column);
+        state.current_token.append(state.iterator.get_current_char());
+        state.iterator.advance();
+        return &multi_line_comment_state;
     }
     else if (c == '"')
     {
@@ -232,6 +244,30 @@ LexerState *SingleLineCommentState::parse(Lexer &state)
         state.current_token.append(c);
         return this;
     }
+}
+
+LexerState *MultilineCommentState::parse(Lexer &state)
+{
+    const char c = state.iterator.get_current_char();
+    state.iterator.advance();
+    if (c == '\n')
+    {
+        return this;
+    }
+
+    // We don't have a \n, so we can add it.
+    state.current_token.append(c);
+    // If the character that was just added was a * and the next is /, then we've
+    // closed the comment.
+    if (c == '*' && state.iterator.get_current_char() == '/')
+    {
+        state.current_token.append(state.iterator.get_current_char());
+        state.iterator.advance();
+        state.flush_token();
+        return &empty_state;
+    }
+
+    return this;
 }
 
 StringOrCharacterState::StringOrCharacterState(char delimiter) : _delimiter(delimiter)
