@@ -1,8 +1,9 @@
 // Copyright (c) 2023 Jean-François Boismenu
 
 #include <luno-cpp/assert.h>
+#include <luno-cpp/lexer.h>
 #include <luno-cpp/line.h>
-#include <luno-cpp/luno.h>
+#include <luno-cpp/preprocessor_states.h>
 
 #include <algorithm>
 #include <array>

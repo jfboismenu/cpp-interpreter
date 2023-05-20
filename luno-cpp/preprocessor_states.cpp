@@ -1,9 +1,12 @@
 // Copyright (c) 2023 Jean-François Boismenu
 
+#include "lexer.h"
 #include <luno-cpp/assert.h>
-#include <luno-cpp/luno.h>
+#include <luno-cpp/lexer.h>
 #include <luno-cpp/preprocessor_states.h>
 #include <luno-cpp/token.h>
+
+#include <array>
 
 // We should do like a real compiler and strip comments first. It would make for a simpler
 // parsing
