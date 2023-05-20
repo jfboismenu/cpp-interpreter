@@ -1,9 +1,7 @@
 // Copyright (c) 2023 Jean-François Boismenu
 
-#include "lexer.h"
-#include <luno-cpp/assert.h>
 #include <luno-cpp/lexer.h>
-#include <luno-cpp/preprocessor_states.h>
+#include <luno-cpp/preprocessor.h>
 #include <luno-cpp/token.h>
 
 #include <array>
@@ -424,7 +422,7 @@ LexerState *ErrorState::parse(Lexer &)
 namespace luno
 {
 
-void parse_translation_unit(Lexer &state)
+void parse(Lexer &state)
 {
 
     LexerState *current = &line_beginning_state;

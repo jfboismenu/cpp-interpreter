@@ -13,7 +13,7 @@ FileIterator::FileIterator(std::vector<Line> &&lines) : _lines(lines)
 {
 }
 
-char FileIterator::get_current_char()
+char FileIterator::get_current_char() const
 {
     // If we're already at the end of the file, just return a whitespace.
     if (_current_line == _lines.size())

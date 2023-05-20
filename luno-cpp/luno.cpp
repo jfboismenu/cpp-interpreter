@@ -3,7 +3,7 @@
 #include <luno-cpp/assert.h>
 #include <luno-cpp/lexer.h>
 #include <luno-cpp/line.h>
-#include <luno-cpp/preprocessor_states.h>
+#include <luno-cpp/preprocessor.h>
 
 #include <algorithm>
 #include <array>
@@ -93,7 +93,7 @@ std::vector<std::string> _tokens_to_string(const std::vector<Token> &tokens)
 void _test_tokenization(const std::string &code, const std::vector<std::string> &expected)
 {
     Lexer lexer({Line{code, 0}});
-    parse_translation_unit(lexer);
+    parse(lexer);
     luno_assert(_tokens_to_string(lexer.get_tokens()), ==, expected);
 }
 

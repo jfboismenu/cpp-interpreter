@@ -2,13 +2,11 @@
 
 #pragma once
 
-#include "lexer.h"
-
 namespace luno
 {
 
 class Lexer;
 
-void parse_translation_unit(Lexer &state);
+void parse(Lexer &state);
 
 } // namespace luno

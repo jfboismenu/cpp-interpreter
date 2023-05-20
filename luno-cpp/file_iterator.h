@@ -18,7 +18,7 @@ class FileIterator
   public:
     FileIterator(std::vector<Line> &&lines);
 
-    char get_current_char();
+    char get_current_char() const;
 
     char peek_next_char();
 
