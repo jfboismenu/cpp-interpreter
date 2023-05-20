@@ -5,6 +5,9 @@
 #include <luno-cpp/preprocessor_states.h>
 #include <luno-cpp/token.h>
 
+// We should do like a real compiler and strip comments first. It would make for a simpler
+// parsing
+
 namespace
 {
 using namespace luno;
@@ -40,10 +43,10 @@ class DecimalState : public LexerState
     LexerState *parse(Lexer &state) override;
 } decimal_state;
 
-class SingleLineCommentState : public LexerState
+class CaptureRestOfLineState : public LexerState
 {
     LexerState *parse(Lexer &state) override;
-} single_line_comment_state;
+} capture_rest_of_line_state;
 
 class MultilineCommentState : public LexerState
 {
@@ -140,6 +143,15 @@ LexerState *LineBeginningState::parse(Lexer &state)
         state.iterator.advance();
         return this;
     }
+    if (c == '#')
+    {
+        const int current_line = state.iterator.current_line();
+        const int current_column = state.iterator.current_column();
+        state.current_token = Token(TokenType::preprocessor_directive, c, current_line, current_column);
+        state.current_token.append(c);
+        state.iterator.advance();
+        return &capture_rest_of_line_state;
+    }
     return &middle_state;
 }
 
@@ -167,7 +179,7 @@ LexerState *MiddleState::parse(Lexer &state)
     else if (c == '/' && state.iterator.get_current_char() == '/')
     {
         state.current_token = Token(TokenType::comment, c, current_line, current_column);
-        return &single_line_comment_state;
+        return &capture_rest_of_line_state;
     }
     else if (c == '/' && state.iterator.get_current_char() == '*')
     {
@@ -245,7 +257,7 @@ LexerState *DecimalState::parse(Lexer &state)
     return &middle_state;
 }
 
-LexerState *SingleLineCommentState::parse(Lexer &state)
+LexerState *CaptureRestOfLineState::parse(Lexer &state)
 {
     const char c = state.iterator.get_current_char();
     state.iterator.advance();

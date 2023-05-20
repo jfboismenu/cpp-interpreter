@@ -10,7 +10,6 @@ namespace luno
 enum class TokenType
 {
     invalid,
-    header_name,
     identifier,
     comment,
     number,
@@ -18,7 +17,7 @@ enum class TokenType
     string_literal,
     operator_,
     punctuator,
-    other
+    preprocessor_directive
 };
 
 class Token
