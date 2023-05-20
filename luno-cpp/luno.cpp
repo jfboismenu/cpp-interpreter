@@ -57,11 +57,15 @@ std::vector<Line> split_text_into_lines(std::string &&text)
 
 void test_line_parsing()
 {
-    const auto current_file = std::filesystem::path(__FILE__);
-    const auto parent_folder = current_file.parent_path();
-    const auto test_file = parent_folder / "test.cpp";
+    std::string text = "// Copyright (c) 2023 Jean-François Boismenu\n"
+                       "\n"
+                       "int i = 0;\n"
+                       "const char *j = \"this is a \\n \\\" string\";\n"
+                       "int k = 0x1234;\n"
+                       "char l = 'c';\n"
+                       "float d = 3.1416;\n"
+                       "bool m = true;\n";
 
-    std::string text = read_file(test_file);
     std::vector<Line> lines = split_text_into_lines(std::move(text));
 
     luno_assert(lines[0].content, ==, "// Copyright (c) 2023 Jean-François Boismenu\n");
